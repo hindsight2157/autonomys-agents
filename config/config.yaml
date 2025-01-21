@@ -10,6 +10,9 @@ twitter:
   POST_INTERVAL_MS: 5400000
   POST_TWEETS: true
 
+auto_drive:
+  upload: true
+
 llm:
   configuration:
     large:
