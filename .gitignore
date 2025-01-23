@@ -1,5 +1,5 @@
-!config/config.example.yaml
-!config/characters/character.example.yaml
+config/**/*.yaml
+!config/character.example/*
 .cookies/
 memories/
 !src/config/

@@ -8,7 +8,8 @@ import { llmDefaultConfig } from './llm.js';
 import { twitterDefaultConfig } from './twitter.js';
 import { memoryDefaultConfig } from './memory.js';
 import yaml from 'yaml';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
+import { loadCharacter } from './characters.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,9 +22,24 @@ try {
   console.error('Error creating cookies directory:', error);
 }
 
-dotenv.config({ path: path.resolve(workspaceRoot, '.env') });
+const characterName = process.argv[2];
+if (!characterName) {
+  console.error('Please provide a character name');
+  // Force immediate exit of the entire process group
+  process.kill(0, 'SIGKILL');
+}
 
-function formatZodError(error: z.ZodError) {
+// Load character-specific .env if it exists, otherwise fall back to root .env
+const characterEnvPath = characterName
+  ? path.resolve(workspaceRoot, 'config', characterName, '.env')
+  : null;
+if (characterEnvPath && existsSync(characterEnvPath)) {
+  dotenv.config({ path: characterEnvPath });
+} else {
+  dotenv.config({ path: path.resolve(workspaceRoot, '.env') });
+}
+
+const formatZodError = (error: z.ZodError) => {
   const missingVars = error.issues.map(issue => {
     const path = issue.path.join('.');
     return `- ${path}: ${issue.message}`;
@@ -31,12 +47,22 @@ function formatZodError(error: z.ZodError) {
   return `Missing or invalid environment variables:
     \n${missingVars.join('\n')}
     \nPlease check your .env file and config.yaml file and ensure all required variables are set correctly.`;
-}
+};
 
-export const agentVersion = process.env.AGENT_VERSION || '1.0.0';
+export const agentVersion = process.env.AGENT_VERSION || '2.0.0';
 
 const yamlConfig = (() => {
   try {
+    // Try to load character-specific config first
+    if (characterName) {
+      const characterConfigPath = path.join(workspaceRoot, 'config', characterName, 'config.yaml');
+      if (existsSync(characterConfigPath)) {
+        const fileContents = readFileSync(characterConfigPath, 'utf8');
+        return yaml.parse(fileContents);
+      }
+    }
+
+    // Fall back to root config.yaml
     const configPath = path.join(workspaceRoot, 'config', 'config.yaml');
     const fileContents = readFileSync(configPath, 'utf8');
     return yaml.parse(fileContents);
@@ -50,6 +76,7 @@ export const config = (() => {
   try {
     const username = process.env.TWITTER_USERNAME || '';
     const cookiesPath = path.join(cookiesDir, `${username}-cookies.json`);
+    const characterConfig = loadCharacter(characterName);
 
     const rawConfig = {
       twitterConfig: {
@@ -57,6 +84,7 @@ export const config = (() => {
         PASSWORD: process.env.TWITTER_PASSWORD || '',
         COOKIES_PATH: cookiesPath,
         ...twitterDefaultConfig,
+
         ...(yamlConfig.twitter
           ? {
               ...yamlConfig.twitter,
@@ -68,6 +96,7 @@ export const config = (() => {
             }
           : {}),
       },
+      characterConfig,
       llmConfig: {
         ...llmDefaultConfig,
         ...(yamlConfig.llm || {}),

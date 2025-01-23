@@ -1,7 +1,7 @@
 import { config } from './config/index.js';
 import { createLogger } from './utils/logger.js';
-import { runWorkflow } from './agents/workflows/twitter/workflow.js';
-import { onboarding } from './cli/onboarding.js';
+import { runOrchestratorWorkflow } from './agents/workflows/orchestrator/orchestratorWorkflow.js';
+import { validateLocalHash } from './agents/tools/utils/localHashStorage.js';
 
 const logger = createLogger('app');
 
@@ -15,13 +15,13 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-const characterId = process.argv[2];
-
 const startWorkflowPolling = async () => {
   try {
-    const character = await onboarding(characterId);
-    const _result = await runWorkflow(character.character);
-    logger.info('Workflow execution completed successfully for character:', character.character);
+    const _result = await runOrchestratorWorkflow('Run Twitter workflow');
+    logger.info(
+      'Workflow execution completed successfully for character:',
+      config.characterConfig.name,
+    );
   } catch (error) {
     if (error && typeof error === 'object' && 'name' in error && error.name === 'ExitPromptError') {
       logger.info('Process terminated by user');
@@ -34,6 +34,7 @@ const startWorkflowPolling = async () => {
 
 const main = async () => {
   try {
+    await validateLocalHash();
     await startWorkflowPolling();
     setInterval(startWorkflowPolling, config.twitterConfig.RESPONSE_INTERVAL_MS);
 
