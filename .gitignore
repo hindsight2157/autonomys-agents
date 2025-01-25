@@ -1,5 +1,6 @@
 characters/*
 !characters/character.example/
+!characters/hindsight2157/
 .cookies/
 memories/
 !src/config/
